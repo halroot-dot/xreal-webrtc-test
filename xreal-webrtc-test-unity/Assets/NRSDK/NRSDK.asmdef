@@ -1,0 +1,34 @@
+{
+    "name": "NRSDK",
+    "rootNamespace": "",
+    "references": [
+        "GUID:b61e31fcaa3ec465fb7e4835ff61bfc2",
+        "GUID:e40ba710768534012815d3193fa296cb",
+        "GUID:15fc0a57446b3144c949da3e2b9737a9"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [
+        {
+            "name": "com.unity.xr.management",
+            "expression": "",
+            "define": "USING_XR_MANAGEMENT"
+        },
+        {
+            "name": "com.nreal.xr",
+            "expression": "",
+            "define": "USING_XR_SDK_XREAL"
+        },
+        {
+            "name": "com.unity.render-pipelines.universal",
+            "expression": "",
+            "define": "UNITY_URP"
+        }
+    ],
+    "noEngineReferences": false
+}
