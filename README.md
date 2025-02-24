@@ -64,6 +64,7 @@ $ npm install
 3. Andoroidでアプリを起動する
 
 次のように表示されれば成功
+
 https://github.com/user-attachments/assets/3ee96af2-5695-4295-93fe-2df4caecff66
 
 ## メモ
