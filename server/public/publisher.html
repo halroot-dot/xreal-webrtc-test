@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebRTC Publisher</title>
+    <style>
+        #localVideo {
+            width: 640px;
+            height: 480px;
+            background: #333;
+        }
+        #debugLog {
+            height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h2>Publisher</h2>
+    <video id="localVideo" autoplay playsinline muted></video>
+    <button id="startButton">Start Streaming</button>
+    <div id="debugLog"></div>
+
+    <script>
+        function log(msg) {
+            console.log(msg);
+            const logDiv = document.getElementById('debugLog');
+            logDiv.innerHTML += msg + '<br>';
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        const ws = new WebSocket('ws://localhost:3001');
+        const configuration = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' }
+            ]
+        };
+        let pc;
+        let localStream;
+
+        async function start() {
+            try {
+                log('Requesting user media');
+                localStream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                        frameRate: { ideal: 30 }
+                    },
+                    audio: true
+                });
+
+                const videoTrack = localStream.getVideoTracks()[0];
+                const videoSettings = videoTrack.getSettings();
+                log('Video track settings: ' + JSON.stringify(videoSettings));
+
+                document.getElementById('localVideo').srcObject = localStream;
+
+                log('Creating RTCPeerConnection');
+                pc = new RTCPeerConnection(configuration);
+
+                localStream.getTracks().forEach(track => {
+                    log('Adding track: ' + track.kind + ' (enabled: ' + track.enabled + ')');
+                    pc.addTrack(track, localStream);
+                });
+
+                // トランシーバーの設定を追加
+                pc.getTransceivers().forEach(transceiver => {
+                    transceiver.direction = 'sendonly';
+                    log('Set transceiver direction to sendonly for: ' + transceiver.sender.track.kind);
+                });
+
+                log('Creating offer');
+                const offer = await pc.createOffer({
+                    offerToReceiveVideo: true,
+                    offerToReceiveAudio: true
+                });
+
+                log('Offer SDP: ' + offer.sdp);
+                await pc.setLocalDescription(offer);
+                ws.send(JSON.stringify({
+                    type: 'offer',
+                    offer: offer
+                }));
+            } catch (e) {
+                log('Error: ' + e);
+            }
+        }
+
+        ws.onmessage = async function(e) {
+            const msg = JSON.parse(e.data);
+            log('Received message type: ' + msg.type);
+
+            if (msg.type === 'answer') {
+                log('Setting remote description (answer)');
+                await pc.setRemoteDescription(new RTCSessionDescription(msg.answer));
+            } else if (msg.type === 'candidate') {
+                log('Adding ICE candidate');
+                await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
+            }
+        };
+
+        ws.onopen = () => log('WebSocket connected');
+        ws.onerror = (error) => log('WebSocket error: ' + error);
+        ws.onclose = () => log('WebSocket closed');
+
+        document.getElementById('startButton').onclick = start;
+    </script>
+</body>
+</html>

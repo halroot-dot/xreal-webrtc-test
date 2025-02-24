@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebRTC Viewer</title>
+    <style>
+        #remoteVideo {
+            width: 640px;
+            height: 480px;
+            background: #333;
+            object-fit: contain;
+        }
+        #debugLog {
+            height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-top: 10px;
+            user-select: text; /* ログのテキスト選択を有効化 */
+        }
+        .controls {
+            margin: 10px 0;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+    <h2>Viewer</h2>
+    <video id="remoteVideo" autoplay playsinline controls></video>
+    <button id="playButton">Play Video</button>
+    <div class="controls">
+        <label>
+            <input type="checkbox" id="autoScroll" checked> Auto-scroll logs
+        </label>
+        <button onclick="clearLog()">Clear Log</button>
+        <button onclick="copyLog()">Copy Log</button>
+    </div>
+    <div id="debugLog"></div>
+
+    <script>
+        let isConnected = false;
+        let statsInterval = null;
+        let ws = null;
+        let pc = null;
+        let autoReconnectTimer = null;
+
+        function log(msg) {
+            console.log(msg);
+            const logDiv = document.getElementById('debugLog');
+            const autoScroll = document.getElementById('autoScroll').checked;
+            const wasScrolledToBottom = logDiv.scrollHeight - logDiv.clientHeight <= logDiv.scrollTop + 1;
+            const date = new Date().toISOString();
+
+            logDiv.innerHTML += `[${date}] ${msg}<br>`;
+
+            if (autoScroll && wasScrolledToBottom) {
+                logDiv.scrollTop = logDiv.scrollHeight;
+            }
+        }
+
+        function clearLog() {
+            document.getElementById('debugLog').innerHTML = '';
+        }
+
+        function copyLog() {
+            const logDiv = document.getElementById('debugLog');
+            const text = logDiv.innerText;
+            navigator.clipboard.writeText(text)
+                .then(() => alert('Log copied to clipboard!'))
+                .catch(err => alert('Failed to copy: ' + err));
+        }
+
+        function stopStatsInterval() {
+            if (statsInterval) {
+                clearInterval(statsInterval);
+                statsInterval = null;
+            }
+        }
+
+        // WebRTC接続の初期化関数
+        function initializeWebRTC() {
+            if (pc) {
+                pc.close();
+            }
+            pc = new RTCPeerConnection({
+                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+            });
+
+            pc.ontrack = handleTrack;
+            pc.onicecandidate = handleIceCandidate;
+            pc.oniceconnectionstatechange = () => {
+                log('ICE Connection State: ' + pc.iceConnectionState);
+                handleConnectionStateChange();
+            };
+            pc.onconnectionstatechange = () => {
+                log('Connection State: ' + pc.connectionState);
+                handleConnectionStateChange();
+            };
+
+            pc.addTransceiver('video', {direction: 'recvonly'});
+            pc.addTransceiver('audio', {direction: 'recvonly'});
+        }
+
+        // WebSocket接続の初期化関数
+        function initializeWebSocket() {
+            if (ws) {
+                ws.close();
+            }
+            ws = new WebSocket('ws://localhost:3001');
+            ws.onopen = handleWebSocketOpen;
+            ws.onclose = handleWebSocketClose;
+            ws.onerror = handleWebSocketError;
+            ws.onmessage = handleWebSocketMessage;
+        }
+
+        function handleConnectionStateChange() {
+            if (pc.connectionState === 'disconnected' ||
+                pc.connectionState === 'failed' ||
+                pc.connectionState === 'closed') {
+                stopStatsInterval();
+                if (ws) {
+                    ws.close();
+                }
+                // 5秒後に再接続を試みる
+                if (!autoReconnectTimer) {
+                    autoReconnectTimer = setTimeout(() => {
+                        autoReconnectTimer = null;
+                        log('Attempting to reconnect...');
+                        initializeWebSocket();
+                        initializeWebRTC();
+                    }, 5000);
+                }
+            } else if (pc.connectionState === 'connected') {
+                isConnected = true;
+                if (autoReconnectTimer) {
+                    clearTimeout(autoReconnectTimer);
+                    autoReconnectTimer = null;
+                }
+            }
+        }
+
+        function handleWebSocketOpen() {
+            isConnected = true;
+            log('WebSocket connected');
+        }
+
+        function handleWebSocketClose() {
+            isConnected = false;
+            stopStatsInterval();
+            log('WebSocket closed');
+            // 接続が切れた場合のメッセージ
+            log('Connection lost. Attempting to reconnect in 5 seconds...');
+        }
+
+        function handleWebSocketError(error) {
+            log('WebSocket error: ' + error);
+        }
+
+        async function handleWebSocketMessage(e) {
+            try {
+                const msg = JSON.parse(e.data);
+                log('Raw message: ' + e.data);
+
+                if (msg.type === 'offer' && msg.offer) {
+                    log('Received offer');
+                    const offerDesc = new RTCSessionDescription({
+                        type: 'offer',
+                        sdp: msg.offer.sdp
+                    });
+                    await pc.setRemoteDescription(offerDesc);
+                    const answer = await pc.createAnswer();
+                    await pc.setLocalDescription(answer);
+
+                    ws.send(JSON.stringify({
+                        type: 'answer',
+                        answer: {
+                            type: 'answer',
+                            sdp: answer.sdp
+                        }
+                    }));
+                } else if (msg.type === 'candidate' && msg.candidate) {
+                    log('Adding ICE candidate');
+                    await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
+                }
+            } catch (error) {
+                log('Error processing message: ' + error);
+            }
+        }
+
+        function handleIceCandidate(e) {
+            if (e.candidate && ws && ws.readyState === WebSocket.OPEN) {
+                log('Sending ICE candidate');
+                ws.send(JSON.stringify({
+                    type: 'candidate',
+                    candidate: e.candidate
+                }));
+            }
+        }
+
+        const remoteVideo = document.getElementById('remoteVideo');
+        const playButton = document.getElementById('playButton');
+
+        playButton.onclick = () => {
+            remoteVideo.play()
+                .then(() => log('Video playback started'))
+                .catch(err => log('Play error: ' + err));
+        };
+
+        remoteVideo.onloadedmetadata = () => {
+            log('Video metadata loaded. Size: ' + remoteVideo.videoWidth + 'x' + remoteVideo.videoHeight);
+        };
+
+        remoteVideo.onplay = () => {
+            log('Video playback started');
+        };
+
+        remoteVideo.onwaiting = () => {
+            log('Video waiting for data');
+        };
+
+        remoteVideo.onerror = (e) => {
+            log('Video error: ' + e.target.error.message);
+        };
+
+        remoteVideo.oncanplay = () => {
+            log('Video can play');
+            remoteVideo.play()
+                .catch(err => log('Play error on canplay: ' + err));
+        };
+
+        remoteVideo.onplaying = () => {
+            log('Video is playing');
+            playButton.style.display = 'none';
+        };
+
+        function handleTrack(e) {
+            log('Received remote track: ' + e.track.kind);
+            log('Track settings: ' + JSON.stringify(e.track.getSettings()));
+
+            if (e.track.kind === 'video') {
+                const remoteVideo = document.getElementById('remoteVideo');
+                if (remoteVideo.srcObject !== e.streams[0]) {
+                    remoteVideo.srcObject = e.streams[0];
+                    log('Set new stream to video element');
+
+                    remoteVideo.play()
+                        .then(() => log('Auto-play started'))
+                        .catch(err => {
+                            log('Auto-play failed: ' + err + ' - Please click play button');
+                            playButton.style.display = 'block';
+                        });
+                }
+
+                e.track.onunmute = () => {
+                    log('Video track unmuted');
+                    remoteVideo.play()
+                        .catch(err => log('Play error on unmute: ' + err));
+                };
+
+                e.track.onmute = () => log('Video track muted');
+                e.track.onended = () => {
+                    log('Video track ended');
+                    stopStatsInterval();
+                };
+
+                // 既存のsetIntervalを停止して新しく開始
+                stopStatsInterval();
+                statsInterval = setInterval(() => {
+                    if (!isConnected) {
+                        stopStatsInterval();
+                        return;
+                    }
+                    if (remoteVideo.videoWidth > 0) {
+                        log('Video dimensions: ' + remoteVideo.videoWidth + 'x' + remoteVideo.videoHeight);
+                        log('Video ready state: ' + remoteVideo.readyState);
+                        log('Video paused: ' + remoteVideo.paused);
+                    }
+                }, 1000);
+            }
+        }
+
+        // 初期化
+        initializeWebSocket();
+        initializeWebRTC();
+
+        // クリーンアップ
+        window.onbeforeunload = () => {
+            stopStatsInterval();
+            if (autoReconnectTimer) {
+                clearTimeout(autoReconnectTimer);
+            }
+            if (ws) {
+                ws.close();
+            }
+            if (pc) {
+                pc.close();
+            }
+        };
+    </script>
+</body>
+</html>
