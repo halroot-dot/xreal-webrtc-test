@@ -52,7 +52,7 @@ $ cd server
 $ npm install
 ```
 
-# 使い方
+## 使い方
 
 1. サンプルサーバを起動する
 
@@ -64,13 +64,24 @@ $ npm install
 3. Andoroidでアプリを起動する
 
 次のように表示されれば成功
+https://github.com/user-attachments/assets/3ee96af2-5695-4295-93fe-2df4caecff66
 
-### 注意事項
+## メモ
+
+* mp4ファイルを作成するNRSDKのサンプルを使って、mp4作成時にそのファイルをWebRTCで送信している
+
+## 注意事項
 
 * Unity Editor上では動作しない。Beam Pro上で動作確認すること
 * AndroidManifest.xmlの権限は縮小できるかも
+  （元々 NRSDKのPlay VideoがXREAL Air2 Proで上手く扱えなくてその時は下記の3つの権限で上手くいったため） 
+  ```xml
+  <uses-permission android:name="android.permission.RECORD_AUDIO" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+  ```
 * 終了した後にNode.jsが終了しているか確認すること
 
-### 参考
+## 参考
 
 * [チュートリアル | WebRTC | 3.0.0-pre.7](https://docs.unity3d.com/ja/Packages/com.unity.webrtc@3.0/manual/tutorial.html)
