@@ -17,8 +17,6 @@ sudo yum install git -y
 git clone https://github.com/halroot-dot/xreal-webrtc-test.git
 cd xreal-webrtc-test/server
 
-// change address at publisher.html
-
 npm install
 npm start
 
