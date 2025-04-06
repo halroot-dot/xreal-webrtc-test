@@ -13,7 +13,7 @@ using System.Collections.Generic;
 public class WebRTCStreamer : MonoBehaviour
 {
     [Header("Settings")]
-    [SerializeField] private string serverUrl = "ws://192.168.x.x:3001/";
+    [SerializeField] private string url = "192.168.x.x";
     [SerializeField] private float recordDurationSeconds = 30.0f; // 30秒毎に録画ファイルを切り替える
 
     private NRVideoCapture m_VideoCapture = null;
@@ -23,15 +23,23 @@ public class WebRTCStreamer : MonoBehaviour
     private VideoStreamHandler videoHandler;
     private string currentVideoPath;
     private Coroutine recordingCoroutine;
+    private string serverUrl;
 
     private bool isProcessingVideo = false;
     private bool isTransitioning = false;
 
     void Start()
     {
+        StartWebRTC();
+    }
+
+    public void StartWebRTC()
+    {
+        serverUrl = $"ws://{url}:3001/";
         Debug.Log("[XREAL_WEBRTC][Init] Creating VideoStreamHandler...");
         try
         {
+            CleanupTempVideoFiles();
             videoHandler = new VideoStreamHandler(1280, 720);
             Debug.Log("[XREAL_WEBRTC][Init] VideoStreamHandler created successfully");
         }
@@ -430,6 +438,27 @@ public class WebRTCStreamer : MonoBehaviour
         }
     }
 
+    private void CleanupTempVideoFiles()
+    {
+        try
+        {
+            string tempPath = Application.temporaryCachePath;
+            var tempFiles = Directory.GetFiles(tempPath, "temp_video_*.mp4");
+
+            foreach (var file in tempFiles)
+            {
+                DeleteVideoFile(file);
+            }
+
+            Debug.Log($"[XREAL_WEBRTC][Cleanup] Deleted {tempFiles.Length} temporary video files");
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[XREAL_WEBRTC][Cleanup] Failed to cleanup temp files: {e.Message}");
+        }
+    }
+
+
     private void HandleTextureUpdated(RenderTexture texture)
     {
         if (texture == null || localPeer == null || isTransitioning) return;
@@ -473,7 +502,7 @@ public class WebRTCStreamer : MonoBehaviour
         }
     }
 
-    void OnDestroy()
+    public void OnDestroy()
     {
         try
         {
@@ -516,10 +545,14 @@ public class WebRTCStreamer : MonoBehaviour
                 m_VideoCapture.Dispose();
                 m_VideoCapture = null;
             }
+
+            CleanupTempVideoFiles();
+            Debug.Log("[XREAL_WEBRTC][Cleanup] Cleanup completed successfully");
         }
         catch (Exception e)
         {
             Debug.LogError($"[XREAL_WEBRTC] Error during cleanup: {e.Message}");
         }
     }
+
 }
