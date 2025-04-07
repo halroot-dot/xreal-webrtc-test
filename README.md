@@ -2,16 +2,19 @@
 
 unity xrealのキャプチャした画面をブラウザで表示したい
 
-* XREAL Air2 Pro
-* Beam Pro
-
 ## 環境構築(Unity)
 
-### インストール
+### 環境
 
-* Unity 6000.0.36f1
-* NRSDK 2.4.1
-* com.unity.webrtc@3.0.0-pre.8
+* Device
+  * XREAL Air2 Pro
+  * Beam Pro
+* App
+  * Unity 6000.0.36f1
+  * NRSDK 2.4.1
+  * com.unity.webrtc@3.0.0-pre.8
+
+### インストール
 
 1. UnityにNRSDKをインポートする
 2. NuGetをインストールする
@@ -35,20 +38,30 @@ unity xrealのキャプチャした画面をブラウザで表示したい
     }
    ```
 
-3. UnityにWebRTCをインポートする
+3. UnityにWebsocketをインポートする
+   NuGetで`websocketsharp.core`をインストールする
+
+4. UnityにWebRTCをインポートする
    [パッケージのインストール | WebRTC | 3.0.0-pre.7](https://docs.unity3d.com/ja/Packages/com.unity.webrtc@3.0/manual/install.html)
 
    ```console
    com.unity.webrtc@3.0.0-pre.8
    ```
 
-4. UnityにWebsocketをインポートする
-   NuGetで`websocketsharp.core`をインストールする
+### Unity内準備
 
-### 準備
+* GameObjectを作成し `Assets/Sample/WebRTCManager.cs` をアタッチ
+* インスペクターでパラメーターを設定する
+  * `Server Url` : サーバのURL(e.g. 192.168.x.x)
+  * `Server Port` : 3001
 
-* `Assets/Sample/WebRTCStreamer.cs`の`serverUrl`をサーバのURLに変更する
-  `serverUrl = "ws://192.168.x.x:3001/";`
+* AndroidManifestに権限を追加する
+
+  ```xml
+  <uses-permission android:name="android.permission.RECORD_AUDIO" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+  ```
 
 ## 環境構築(サンプルサーバ)
 
@@ -78,10 +91,17 @@ npm install
 ## メモ
 
 * mp4ファイルを作成するNRSDKのサンプルを使って、mp4作成時にそのファイルをWebRTCで送信している
+* adbでファイルを確認できる
+
+  ```shell
+  > adb tcpip 5555
+  > adb connect 192.168.x.x:5555
+  > adb shell ls /storage/emulated/0/Android/data/com.DefaultCompany.test/cache
+  ```
 
 ## 注意事項
 
-* Unity Editor上では動作しない。Beam Pro上で動作確認すること
+* Unity Editor上とBeam Proは環境が異なるため実機で動作確認すること
 * AndroidManifest.xmlの権限は縮小できるかも（元々NRSDKのPlay VideoがXREAL Air2 Proで上手く扱えなくてその時は下記の3つの権限で上手くいったため）
 
   ```xml
@@ -91,7 +111,3 @@ npm install
   ```
 
 * 終了した後にNode.jsが終了しているか確認すること
-
-## 参考
-
-* [チュートリアル | WebRTC | 3.0.0-pre.7](https://docs.unity3d.com/ja/Packages/com.unity.webrtc@3.0/manual/tutorial.html)
