@@ -81,7 +81,7 @@ npm install
    npm start
    ```
 
-2. ブラウザで`viewer.html`を開く
+2. ブラウザで`viewer.html`を開く（http://`<ip address>`:3001/viewer.html）
 3. Andoroidでアプリを起動する
 
 次のように表示されれば成功
