@@ -6,8 +6,8 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/Sample/HandTrackingSample.unity
-    guid: 48a4b84ef56631949846bef685682015
+    path: Assets/GeoguessrAnswer/Scenes/geoguessr_answer.unity
+    guid: 4d3726a70e8e6e04ca6150f98c52fa7b
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 289c1b55c9541489481df5cc06664110, type: 3}
   m_UseUCBPForAssetBundles: 0
